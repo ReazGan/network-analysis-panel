@@ -34,8 +34,12 @@ pip install flask flask-socketio scapy requests eventlet
 
 3. Projeyi çalıştırmak için run_as_admin.bat dosyasına çift tıklayın. Bu dosya, programın ağı dinleyebilmesi için gerekli olan yönetici izinlerini otomatik olarak isteyecektir.
 Program çalıştığında, varsayılan web tarayıcınızda http://127.0.0.1:5000 adresi otomatik olarak açılacaktır.
+
+
 ⚠️ Etik Kullanım Uyarısı
 Bu araç, yalnızca eğitim ve yasal test amaçlı geliştirilmiştir. Bu aracı asla size ait olmayan veya test etme izninizin bulunmadığı sistemler üzerinde kullanmayın. İzin alınmadan yapılan tarama işlemleri yasa dışıdır ve siber suç teşkil edebilir.
+
+
 🇬🇧 English
 🚀 Features
    * Live Geo-Map Visualization: Instantly plots incoming and outgoing network connections on a live, satellite-view world map.
