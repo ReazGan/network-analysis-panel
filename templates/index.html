@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gelişmiş Ağ Analiz Paneli</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+    <style>
+        :root {
+            --background-color: #0d1117; --panel-color: #161b22; --border-color: #30363d;
+            --text-color: #c9d1d9; --text-muted-color: #8b949e; --accent-color: #58a6ff;
+            --tcp-color: #3fb950; --udp-color: #f778ba; --other-color: #d29922; --danger-color: #e05252;
+        }
+        body {
+            font-family: 'Consolas', 'Courier New', monospace; background-color: var(--background-color);
+            color: var(--text-color); margin: 0; padding: 20px; box-sizing: border-box;
+            height: 100vh; display: flex; flex-direction: column;
+        }
+        h1 {
+            text-align: center; color: var(--accent-color); border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px; margin-top: 0; flex-shrink: 0;
+        }
+        .dashboard { display: flex; gap: 20px; flex-grow: 1; overflow: hidden; }
+        .panel {
+            background-color: var(--panel-color); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 20px; display: flex; flex-direction: column;
+        }
+        .panel h2 { margin-top: 0; color: var(--text-muted-color); font-size: 1.2em; flex-shrink: 0; }
+        #map-panel { flex: 2; }
+        #map { flex-grow: 1; border-radius: 6px; background-color: #000; }
+        .right-column {
+            flex: 1; display: flex; flex-direction: column; gap: 20px;
+            min-width: 400px; overflow: hidden;
+        }
+        #controls-panel { flex-shrink: 0; }
+        .controls-container { display: flex; gap: 10px; justify-content: space-between; align-items: center; }
+        .control-buttons button {
+            background-color: var(--border-color); color: var(--text-color); border: 1px solid #4a5058;
+            padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: background-color 0.2s;
+        }
+        .control-buttons button:hover { background-color: #4a5058; }
+        #status-indicator { font-size: 0.9em; }
+        #status-indicator.paused { color: var(--danger-color); }
+        #status-indicator.running { color: var(--tcp-color); }
+        
+        /* DÜZELTME BURADA BAŞLIYOR */
+        #protocol-chart-panel {
+            height: 320px; /* Sabit bir yükseklik veriyoruz */
+            flex-shrink: 0; /* Küçülmesini kesinlikle engelliyoruz */
+        }
+        #activity-feed-panel {
+            flex-grow: 1; /* Kalan tüm alanı kapla */
+            min-height: 0; /* Flexbox'ın doğru boyutlandırma yapmasını sağlayan bir trick */
+            overflow: hidden; 
+        }
+        .chart-container { position: relative; height: 100%; flex-grow: 1; }
+        #protocolChart { cursor: pointer; }
+        .chart-hint { font-size: 0.8em; text-align: center; color: var(--text-muted-color); margin-top: 5px; flex-shrink: 0; }
+        #log-list { list-style: none; padding: 0; margin: 0; height: 100%; overflow-y: auto; font-size: 0.9em; }
+        #log-list li { padding: 5px 8px; border-bottom: 1px solid #21262d; animation: fadeIn 0.3s ease; word-break: break-all; }
+        .highlight { color: var(--accent-color); font-weight: bold; }
+        .log-danger { color: var(--danger-color); font-weight: bold; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <h1><span class="icon">⚡</span> Gelişmiş Ağ Analiz Paneli</h1>
+
+    <div class="dashboard">
+        <div id="map-panel" class="panel">
+            <h2>Coğrafi Bağlantı Haritası</h2>
+            <div id="map"></div>
+        </div>
+
+        <div class="right-column">
+            <div id="controls-panel" class="panel">
+                <div class="controls-container">
+                    <div class="control-buttons">
+                        <button id="toggle-pause-btn">Durdur</button>
+                        <button id="clear-map-btn">Haritayı Temizle</button>
+                    </div>
+                    <span id="status-indicator" class="running">● Canlı</span>
+                </div>
+            </div>
+            
+            <div id="protocol-chart-panel" class="panel">
+                <h2>Protokol Dağılımı</h2>
+                <div class="chart-container"> <canvas id="protocolChart"></canvas> </div>
+                <p class="chart-hint">(Filtrelemek için grafiğe tıklayın)</p>
+            </div>
+            
+            <div id="activity-feed-panel" class="panel">
+                <h2>Konsol Çıktısı</h2>
+                <ul id="log-list"><li>Sunucuya bağlanılıyor...</li></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // === DEĞİŞKENLER VE AYARLARI ===
+            const mapOptions = {
+                center: [30, 10], 
+                zoom: 2.5,
+                worldCopyJump: false,
+                maxBounds: [ [-90, -180], [90, 180] ], 
+                maxBoundsViscosity: 1.0 
+            };
+            const map = L.map('map', mapOptions);
+            const logList = document.getElementById('log-list');
+            const pauseBtn = document.getElementById('toggle-pause-btn');
+            const clearBtn = document.getElementById('clear-map-btn');
+            const statusIndicator = document.getElementById('status-indicator');
+            let allConnections = []; 
+            let connectionMarkers = L.layerGroup().addTo(map);
+            let isPaused = false;
+            
+            // === HARİTA AYARLARI ===
+            // HARİTA DÜZELTMESİ: Canlı uydu görüntüsü kullanıyoruz
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '&copy; Esri &mdash; Kaynak: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, ve GIS Kullanıcı Topluluğu',
+                maxZoom: 18,
+                noWrap: true // Haritanın kendini tekrar etmesini engelle
+            }).addTo(map);
+
+            setTimeout(() => { map.invalidateSize() }, 400);
+
+            // === GRAFİK AYARLARI ===
+            const chartCtx = document.getElementById('protocolChart').getContext('2d');
+            const protocolData = { labels: ['TCP', 'UDP', 'Diğer'], datasets: [{ data: [0, 0, 0], backgroundColor: ['rgba(63, 185, 80, 0.8)', 'rgba(247, 120, 186, 0.8)', 'rgba(210, 153, 34, 0.8)'], borderColor: '#161b22', borderWidth: 2 }] };
+            const protocolChart = new Chart(chartCtx, { type: 'doughnut', data: protocolData, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: 'var(--text-color)' } } }, onClick: (e, elements) => { if(elements[0]) filterConnectionsByProtocol(protocolData.labels[elements[0].index]); } } });
+
+            // === KONTROL BUTONLARI ===
+            pauseBtn.addEventListener('click', () => {
+                isPaused = !isPaused;
+                pauseBtn.textContent = isPaused ? 'Başlat' : 'Durdur';
+                statusIndicator.textContent = isPaused ? '● Durduruldu' : '● Canlı';
+                statusIndicator.className = isPaused ? 'paused' : 'running';
+                addLog(`[KONTROL] Veri akışı ${isPaused ? 'durduruldu.' : 'başlatıldı.'}`);
+            });
+            clearBtn.addEventListener('click', () => {
+                connectionMarkers.clearLayers();
+                allConnections = [];
+                protocolChart.data.datasets[0].data = [0, 0, 0];
+                protocolChart.update();
+                addLog('[KONTROL] Tüm veriler ve harita temizlendi.');
+            });
+
+            // === YARDIMCI FONKSİYONLAR ===
+            function filterConnectionsByProtocol(protocol) {
+                displayConnectionsOnMap(allConnections.filter(c => c.protocol === protocol), protocol);
+            }
+
+            function displayConnectionsOnMap(connections, protocol) {
+                connectionMarkers.clearLayers();
+                addLog(`[FILTRE] Sadece '${protocol}' bağlantıları haritada gösteriliyor.`);
+                connections.forEach(conn => {
+                    const d = conn.destination;
+                    const isSuspicious = d.reputation === 'Şüpheli';
+                    let markerColor = protocol === 'TCP' ? 'var(--tcp-color)' : protocol === 'UDP' ? 'var(--udp-color)' : 'var(--other-color)';
+                    if (isSuspicious) markerColor = 'var(--danger-color)';
+                    
+                    const marker = L.circleMarker([d.lat, d.lon], { radius: 6, color: markerColor, fillOpacity: 0.8 }).addTo(connectionMarkers);
+                    marker.bindPopup(`<b>${d.hostname || d.city}</b><br>IP: ${d.ip}:${d.port}<br>Kuruluş: ${d.org}<br>İtibar: ${d.reputation}`);
+                });
+            }
+
+            function addLog(message, cssClass = '') {
+                const newItem = document.createElement('li');
+                newItem.textContent = message;
+                if(cssClass) newItem.className = cssClass;
+                logList.prepend(newItem);
+                if (logList.children.length > 150) logList.removeChild(logList.lastChild);
+            }
+
+            // === SOCKET.IO BAĞLANTISI VE OLAY DİNLEYİCİLER ===
+            const socket = io();
+            socket.on('connect', () => addLog('[*] Sunucuya başarıyla bağlanıldı!', 'highlight'));
+
+            socket.on('new_connection', (data) => {
+                if (isPaused) return;
+                allConnections.push(data);
+                const { source, destination, protocol } = data;
+                
+                const isSuspicious = destination.reputation === 'Şüpheli';
+                const logMessage = `[${isSuspicious ? '⚠️' : '*'}] Bağlantı -> ${destination.hostname || destination.ip}:${destination.port} (${protocol})`;
+                addLog(logMessage, isSuspicious ? 'log-danger' : 'highlight');
+
+                if (source.lat && source.lon && destination.lat && destination.lon) {
+                    const line = L.polyline([[source.lat, source.lon], [destination.lat, destination.lon]], { color: isSuspicious ? 'var(--danger-color)' : 'var(--accent-color)', weight: 1.5, opacity: 0.7 }).addTo(map);
+                    setTimeout(() => map.removeLayer(line), 2500);
+                }
+
+                const protocolIndex = protocolData.labels.indexOf(protocol);
+                if (protocolIndex !== -1) {
+                    protocolChart.data.datasets[0].data[protocolIndex]++;
+                    protocolChart.update();
+                }
+            });
+
+            socket.on('log_update', (data) => addLog(data.data));
+            socket.on('disconnect', () => addLog('[HATA] Sunucu bağlantısı koptu!', 'log-danger'));
+        });
+    </script>
+
+</body>
+</html>
