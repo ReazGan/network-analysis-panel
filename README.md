@@ -1,8 +1,8 @@
 ⚡ Live Network Analysis Dashboard
 Python ve modern web teknolojileri kullanılarak geliştirilmiş, gerçek zamanlı ağ trafiğini coğrafi bir harita ve interaktif paneller üzerinde görselleştiren bir siber güvenlik aracı.
 
+![image](https://github.com/user-attachments/assets/ba7cae06-1df7-4223-a738-59b92de41171)
 
-(Paneli çalışırken gösteren demo GIF'i)
 🇹🇷 Türkçe
 🚀 Özellikler
 * Canlı Harita Görselleştirmesi: Gelen ve giden tüm ağ bağlantılarını, dünya üzerinde canlı ve renkli bir uydu haritasında anlık olarak gösterir.
