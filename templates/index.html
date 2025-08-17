@@ -48,14 +48,13 @@
         #status-indicator.paused { color: var(--danger-color); }
         #status-indicator.running { color: var(--tcp-color); }
         
-        /* DÜZELTME BURADA BAŞLIYOR */
         #protocol-chart-panel {
-            height: 320px; /* Sabit bir yükseklik veriyoruz */
-            flex-shrink: 0; /* Küçülmesini kesinlikle engelliyoruz */
+            height: 320px;
+            flex-shrink: 0;
         }
         #activity-feed-panel {
-            flex-grow: 1; /* Kalan tüm alanı kapla */
-            min-height: 0; /* Flexbox'ın doğru boyutlandırma yapmasını sağlayan bir trick */
+            flex-grow: 1;
+            min-height: 0;
             overflow: hidden; 
         }
         .chart-container { position: relative; height: 100%; flex-grow: 1; }
@@ -104,7 +103,6 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // === DEĞİŞKENLER VE AYARLARI ===
             const mapOptions = {
                 center: [30, 10], 
                 zoom: 2.5,
@@ -121,22 +119,18 @@
             let connectionMarkers = L.layerGroup().addTo(map);
             let isPaused = false;
             
-            // === HARİTA AYARLARI ===
-            // HARİTA DÜZELTMESİ: Canlı uydu görüntüsü kullanıyoruz
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 attribution: '&copy; Esri &mdash; Kaynak: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, ve GIS Kullanıcı Topluluğu',
                 maxZoom: 18,
-                noWrap: true // Haritanın kendini tekrar etmesini engelle
+                noWrap: true
             }).addTo(map);
 
             setTimeout(() => { map.invalidateSize() }, 400);
 
-            // === GRAFİK AYARLARI ===
             const chartCtx = document.getElementById('protocolChart').getContext('2d');
             const protocolData = { labels: ['TCP', 'UDP', 'Diğer'], datasets: [{ data: [0, 0, 0], backgroundColor: ['rgba(63, 185, 80, 0.8)', 'rgba(247, 120, 186, 0.8)', 'rgba(210, 153, 34, 0.8)'], borderColor: '#161b22', borderWidth: 2 }] };
             const protocolChart = new Chart(chartCtx, { type: 'doughnut', data: protocolData, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: 'var(--text-color)' } } }, onClick: (e, elements) => { if(elements[0]) filterConnectionsByProtocol(protocolData.labels[elements[0].index]); } } });
 
-            // === KONTROL BUTONLARI ===
             pauseBtn.addEventListener('click', () => {
                 isPaused = !isPaused;
                 pauseBtn.textContent = isPaused ? 'Başlat' : 'Durdur';
@@ -152,7 +146,6 @@
                 addLog('[KONTROL] Tüm veriler ve harita temizlendi.');
             });
 
-            // === YARDIMCI FONKSİYONLAR ===
             function filterConnectionsByProtocol(protocol) {
                 displayConnectionsOnMap(allConnections.filter(c => c.protocol === protocol), protocol);
             }
@@ -179,7 +172,6 @@
                 if (logList.children.length > 150) logList.removeChild(logList.lastChild);
             }
 
-            // === SOCKET.IO BAĞLANTISI VE OLAY DİNLEYİCİLER ===
             const socket = io();
             socket.on('connect', () => addLog('[*] Sunucuya başarıyla bağlanıldı!', 'highlight'));
 
@@ -211,3 +203,4 @@
 
 </body>
 </html>
+
