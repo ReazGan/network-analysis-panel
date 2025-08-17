@@ -1,4 +1,3 @@
-# Gerekli kütüphaneleri içe aktarıyoruz
 from flask import Flask, render_template
 from flask_socketio import SocketIO
 import threading
@@ -10,7 +9,6 @@ import logging
 import sys 
 import ctypes
 
-# Scapy ve Requests kütüphanelerini kontrol ederek içe aktar
 try:
     from scapy.all import sniff, IP, TCP, UDP
     from scapy.arch.windows import get_windows_if_list
@@ -19,16 +17,13 @@ except ImportError as e:
     print(f"[HATA] Gerekli bir kütüphane eksik: {e}. Lütfen 'pip install scapy requests' komutu ile yükleyin.")
     sys.exit()
 
-# Flask ve SocketIO uygulamasını başlatıyoruz
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret_key_for_visualizer'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Terminali temiz tutmak için logları gizle
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-# Global değişkenler ve önbellekler
 ip_cache = {}
 hostname_cache = {}
 MY_LOCATION = {"city": "İstanbul", "country": "Türkiye", "lat": 41.0082, "lon": 28.9784}
@@ -174,4 +169,5 @@ if __name__ == '__main__':
     threading.Timer(1, open_browser).start()
     print("[*] Sunucu http://127.0.0.1:5000 adresinde başlatılıyor... Çıkmak için CTRL+C'ye basın.")
     socketio.run(app, host='127.0.0.1', port=5000)
+
 
